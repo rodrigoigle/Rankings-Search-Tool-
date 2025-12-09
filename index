@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Rankings Search</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            gap: 40px;
+        }
+
+        .left-panel {
+            flex: 0 0 350px;
+        }
+
+        .right-panel {
+            flex: 1;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            font-weight: 500;
+            color: #fff;
+        }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 16px 20px;
+            font-size: 16px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background-color: #252525;
+            color: #fff;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #555;
+        }
+
+        input[type="text"]::placeholder {
+            color: #666;
+        }
+
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: #252525;
+            border: 1px solid #333;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none;
+        }
+
+        .suggestions.active {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+
+        .suggestion-item:hover {
+            background-color: #333;
+        }
+
+        .results {
+            background-color: #252525;
+            border-radius: 8px;
+            padding: 20px;
+            display: none;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .results h2 {
+            font-size: 14px;
+            font-weight: 500;
+            color: #888;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .school-name {
+            font-size: 18px;
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+
+        .ranking-item {
+            padding: 10px 0;
+            font-size: 16px;
+            color: #e0e0e0;
+        }
+
+        .no-results {
+            color: #888;
+            font-style: italic;
+        }
+
+        .loading {
+            text-align: center;
+            color: #888;
+            padding: 20px;
+        }
+
+        .error {
+            background-color: #3d2020;
+            color: #ff6b6b;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <h1>School Rankings</h1>
+            
+            <div class="search-box">
+                <input type="text" id="search" placeholder="Type school name..." autocomplete="off">
+                <div class="suggestions" id="suggestions"></div>
+            </div>
+
+            <div class="error" id="error" style="display: none;"></div>
+        </div>
+
+        <div class="right-panel">
+            <div class="results" id="results">
+                <h2>Rankings</h2>
+                <div class="school-name" id="school-name"></div>
+                <div id="rankings-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let dictionary = [];
+        let rankings = {};
+
+        async function loadCSV(url) {
+            const response = await fetch(url);
+            const text = await response.text();
+            const lines = text.trim().split('\n');
+            return lines.map(line => {
+                const parts = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        parts.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                parts.push(current.trim());
+                return parts;
+            });
+        }
+
+        async function init() {
+            try {
+                // Load dictionary
+                const dictData = await loadCSV('data/dictionary.csv');
+                dictionary = dictData.map(row => ({
+                    name: row[0],
+                    id: row[1]
+                }));
+
+                // Load ranking files - you'll need to list them here
+                const rankingFiles = await getRankingFiles();
+                
+                for (const file of rankingFiles) {
+                    const rankingName = file.replace('.csv', '');
+                    const data = await loadCSV(`data/${file}`);
+                    rankings[rankingName] = {};
+                    data.forEach(row => {
+                        const position = row[0];
+                        const id = row[1];
+                        if (id) {
+                            rankings[rankingName][id] = position;
+                        }
+                    });
+                }
+
+                document.getElementById('search').disabled = false;
+                document.getElementById('search').placeholder = 'Type school name...';
+
+            } catch (error) {
+                showError('Error loading data: ' + error.message);
+            }
+        }
+
+        async function getRankingFiles() {
+            return [
+                'Financial Times Top 100 Global MBA 2025.csv',
+                'Financial Times Top 100 European Business Schools 2024.csv',
+                'QS Top 100 Global MBA 2026.csv',
+                'Financial Times Top 100 Global Executive MBA 2024.csv',
+                'Financial Times Top 15 Online MBA  2025.csv',
+                'U.S. News Top 100 MBA 2025.csv',
+                'Shanghai Rankings - Top 100 Universities 2025.csv'
+            ];
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        function searchSchool(query) {
+            if (!query || query.length < 2) return [];
+            const lowerQuery = query.toLowerCase();
+            return dictionary.filter(school => 
+                school.name.toLowerCase().includes(lowerQuery)
+            ).slice(0, 10);
+        }
+
+        function findRankings(schoolId) {
+            const results = [];
+            for (const [rankingName, data] of Object.entries(rankings)) {
+                if (data[schoolId]) {
+                    results.push({
+                        position: data[schoolId],
+                        name: rankingName
+                    });
+                }
+            }
+            return results;
+        }
+
+        function displayResults(school) {
+            const resultsEl = document.getElementById('results');
+            const schoolNameEl = document.getElementById('school-name');
+            const listEl = document.getElementById('rankings-list');
+
+            const rankingResults = findRankings(school.id);
+
+            schoolNameEl.textContent = school.name;
+            
+            if (rankingResults.length === 0) {
+                listEl.innerHTML = '<div class="no-results">No rankings found for this school</div>';
+            } else {
+                listEl.innerHTML = rankingResults
+                    .map(r => `<div class="ranking-item">#${r.position} ${r.name}</div>`)
+                    .join('');
+            }
+
+            resultsEl.classList.add('active');
+        }
+
+        // Event listeners
+        const searchInput = document.getElementById('search');
+        const suggestionsEl = document.getElementById('suggestions');
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+            const matches = searchSchool(query);
+
+            if (matches.length > 0) {
+                suggestionsEl.innerHTML = matches
+                    .map(school => `<div class="suggestion-item" data-id="${school.id}" data-name="${school.name}">${school.name}</div>`)
+                    .join('');
+                suggestionsEl.classList.add('active');
+            } else {
+                suggestionsEl.classList.remove('active');
+            }
+        });
+
+        suggestionsEl.addEventListener('click', (e) => {
+            if (e.target.classList.contains('suggestion-item')) {
+                const school = {
+                    id: e.target.dataset.id,
+                    name: e.target.dataset.name
+                };
+                searchInput.value = school.name;
+                suggestionsEl.classList.remove('active');
+                displayResults(school);
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-box')) {
+                suggestionsEl.classList.remove('active');
+            }
+        });
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>
