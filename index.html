@@ -181,17 +181,17 @@
         <div class="left-panel">
             <h1>School Rankings</h1>
             
-            <div class="search-box">
-                <input type="text" id="search" placeholder="Type school name..." autocomplete="off">
-                <div class="suggestions" id="suggestions"></div>
-            </div>
-
             <div class="dropdown-group">
                 <label>Ranking Type</label>
                 <select id="rankingType" onchange="switchRankingType()">
                     <option value="mba">MBA Rankings</option>
                     <option value="master">Master Rankings</option>
                 </select>
+            </div>
+
+            <div class="search-box">
+                <input type="text" id="search" placeholder="Type school name..." autocomplete="off">
+                <div class="suggestions" id="suggestions"></div>
             </div>
 
             <div class="error" id="error" style="display: none;"></div>
