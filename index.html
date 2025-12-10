@@ -42,7 +42,34 @@
 
         .search-box {
             position: relative;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+        }
+
+        .dropdown-group {
+            margin-bottom: 20px;
+        }
+
+        .dropdown-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background-color: #252525;
+            color: #fff;
+            outline: none;
+            cursor: pointer;
+        }
+
+        select:focus {
+            border-color: #555;
         }
 
         input[type="text"] {
@@ -159,6 +186,14 @@
                 <div class="suggestions" id="suggestions"></div>
             </div>
 
+            <div class="dropdown-group">
+                <label>Ranking Type</label>
+                <select id="rankingType" onchange="switchRankingType()">
+                    <option value="mba">MBA Rankings</option>
+                    <option value="master">Master Rankings</option>
+                </select>
+            </div>
+
             <div class="error" id="error" style="display: none;"></div>
         </div>
 
@@ -174,6 +209,28 @@
     <script>
         let dictionary = [];
         let rankings = {};
+        let currentRankingType = 'mba';
+
+        const RANKING_CONFIG = {
+            mba: {
+                folder: 'data',
+                files: [
+                    'Financial Times Top 100 Global MBA 2025.csv',
+                    'Financial Times Top 100 European Business Schools 2024.csv',
+                    'QS Top 100 Global MBA 2026.csv',
+                    'Financial Times Top 100 Global Executive MBA 2024.csv',
+                    'Financial Times Top 15 Online MBA  2025.csv',
+                    'U.S. News Top 100 MBA 2025.csv',
+                    'Shanghai Rankings - Top 100 Universities 2025.csv'
+                ]
+            },
+            master: {
+                folder: 'Master Data',
+                files: [
+                    'Financial Times Top Masters in Management 2025.csv'
+                ]
+            }
+        };
 
         async function loadCSV(url) {
             const response = await fetch(url);
@@ -200,6 +257,28 @@
             });
         }
 
+        async function loadRankings(rankingType) {
+            const config = RANKING_CONFIG[rankingType];
+            rankings = {};
+            
+            for (const file of config.files) {
+                const rankingName = file.replace('.csv', '');
+                try {
+                    const data = await loadCSV(`${config.folder}/${file}`);
+                    rankings[rankingName] = {};
+                    data.forEach(row => {
+                        const position = row[0];
+                        const id = row[1];
+                        if (id) {
+                            rankings[rankingName][id] = position;
+                        }
+                    });
+                } catch (error) {
+                    console.warn(`Could not load ${file}:`, error);
+                }
+            }
+        }
+
         async function init() {
             try {
                 // Load dictionary
@@ -209,21 +288,8 @@
                     id: row[1]
                 }));
 
-                // Load ranking files - you'll need to list them here
-                const rankingFiles = await getRankingFiles();
-                
-                for (const file of rankingFiles) {
-                    const rankingName = file.replace('.csv', '');
-                    const data = await loadCSV(`data/${file}`);
-                    rankings[rankingName] = {};
-                    data.forEach(row => {
-                        const position = row[0];
-                        const id = row[1];
-                        if (id) {
-                            rankings[rankingName][id] = position;
-                        }
-                    });
-                }
+                // Load default (MBA) rankings
+                await loadRankings('mba');
 
                 document.getElementById('search').disabled = false;
                 document.getElementById('search').placeholder = 'Type school name...';
@@ -233,16 +299,18 @@
             }
         }
 
-        async function getRankingFiles() {
-            return [
-                'Financial Times Top 100 Global MBA 2025.csv',
-                'Financial Times Top 100 European Business Schools 2025.csv',
-                'QS Top 100 Global MBA 2026.csv',
-                'Financial Times Top Global Executive MBA 2025.csv',
-                'Financial Times Top 15 Online MBA  2025.csv',
-                'U.S. News Top 100 MBA 2025.csv',
-                'Shanghai Rankings - Top 100 Universities 2025.csv'
-            ];
+        async function switchRankingType() {
+            const rankingType = document.getElementById('rankingType').value;
+            if (rankingType !== currentRankingType) {
+                currentRankingType = rankingType;
+                
+                // Clear current results
+                document.getElementById('results').classList.remove('active');
+                document.getElementById('search').value = '';
+                
+                // Load new rankings
+                await loadRankings(rankingType);
+            }
         }
 
         function showError(message) {
