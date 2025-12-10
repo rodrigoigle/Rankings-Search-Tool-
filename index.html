@@ -214,6 +214,7 @@
         const RANKING_CONFIG = {
             mba: {
                 folder: 'data',
+                dictionary: 'data/dictionary.csv',
                 files: [
                     'Financial Times Top 100 Global MBA 2025.csv',
                     'Financial Times Top 100 European Business Schools 2024.csv',
@@ -226,6 +227,7 @@
             },
             master: {
                 folder: 'Master Data',
+                dictionary: 'Master Data/dictionary master.csv',
                 files: [
                     'Financial Times Top Masters in Management 2025.csv'
                 ]
@@ -279,16 +281,19 @@
             }
         }
 
+        async function loadDictionary(rankingType) {
+            const config = RANKING_CONFIG[rankingType];
+            const dictData = await loadCSV(config.dictionary);
+            dictionary = dictData.map(row => ({
+                name: row[0],
+                id: row[1]
+            }));
+        }
+
         async function init() {
             try {
-                // Load dictionary
-                const dictData = await loadCSV('data/dictionary.csv');
-                dictionary = dictData.map(row => ({
-                    name: row[0],
-                    id: row[1]
-                }));
-
-                // Load default (MBA) rankings
+                // Load default (MBA) dictionary and rankings
+                await loadDictionary('mba');
                 await loadRankings('mba');
 
                 document.getElementById('search').disabled = false;
@@ -308,7 +313,8 @@
                 document.getElementById('results').classList.remove('active');
                 document.getElementById('search').value = '';
                 
-                // Load new rankings
+                // Load new dictionary and rankings
+                await loadDictionary(rankingType);
                 await loadRankings(rankingType);
             }
         }
